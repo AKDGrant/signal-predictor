@@ -44,9 +44,6 @@ def stochastic_k(high, low, close, k_window=14):
     highest_high = high.rolling(k_window).max()
     return 100 * (close - lowest_low) / (highest_high - lowest_low)
 
-from google.colab import files
-uploaded = files.upload()  # choose 'week1_final_dataset.csv' from your downloads
-
 import pandas as pd
 
 df = pd.read_csv("week1_final_dataset.csv", parse_dates=True)
