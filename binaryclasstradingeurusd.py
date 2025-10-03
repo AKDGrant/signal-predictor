@@ -7,9 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1kk9I6vA0QZJrs_hdXVU2R-vhYG21SAMS
 """
 
-# Install LightGBM if needed
-!pip install --quiet lightgbm
-
 # Imports
 import pandas as pd
 import numpy as np
