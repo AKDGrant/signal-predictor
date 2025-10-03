@@ -13,7 +13,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-st.title("Week 2 Signal Predictor")
+st.title("Week 2 Signal Predictor - EUR/USD")
 
 # -------------------------
 # Dataset upload
@@ -140,33 +140,46 @@ if uploaded_file is not None:
     model.fit(X_train, y_train)
 
     # Make predictions
-    y_pred = model.predict(X_test)
+    df_model['Predicted_Label'] = model.predict(X)
+    label_map = {1: "Buy", 0: "Hold", -1: "Sell"}
+    df_model['Predicted_Label_Str'] = df_model['Predicted_Label'].map(label_map)
 
     # -------------------------
-    # Display evaluation
+    # Show most recent price & signal
     # -------------------------
+    latest_row = df_model.iloc[-1]
+    latest_price = latest_row['Close']
+    latest_signal = latest_row['Predicted_Label_Str']
+
+    st.subheader("Most Recent Price & Signal")
+    st.write(f"Price: {latest_price:.5f}")
+    st.write(f"Signal: {latest_signal}")
+
+    # -------------------------
+    # Display last 20 signals
+    # -------------------------
+    st.subheader("Last 20 Predicted Signals")
+    st.dataframe(df_model[['Close', 'Predicted_Label_Str']].tail(20))
+
+    # -------------------------
+    # Model evaluation
+    # -------------------------
+    y_test_pred = model.predict(X_test)
+
     st.subheader("Classification Report")
-    st.text(classification_report(y_test, y_pred))
+    st.text(classification_report(y_test, y_test_pred))
 
     st.subheader("Confusion Matrix")
-    st.write(confusion_matrix(y_test, y_pred))
+    st.write(confusion_matrix(y_test, y_test_pred))
 
-    # Save model
-    joblib.dump(model, 'lgbm_model.pkl')
-    st.write("Model saved as lgbm_model.pkl")
-
-    # Feature importance plot
+    # -------------------------
+    # Feature importance
+    # -------------------------
     st.subheader("Top 20 Feature Importances")
     fig, ax = plt.subplots(figsize=(10,6))
     lgb.plot_importance(model, max_num_features=20, importance_type='gain', ax=ax)
     st.pyplot(fig)
 
-    # -------------------------
-    # Show Buy/Sell/Hold signals
-    # -------------------------
-    df_model['Predicted_Label'] = model.predict(X)
-    label_map = {1: "Buy", 0: "Hold", -1: "Sell"}
-    df_model['Predicted_Label_Str'] = df_model['Predicted_Label'].map(label_map)
-
-    st.subheader("Predicted Buy/Sell/Hold Signals (Last 20 Rows)")
-    st.dataframe(df_model[['Close', 'Predicted_Label_Str']].tail(20))
+    # Save model
+    joblib.dump(model, 'lgbm_model.pkl')
+    st.write("Model saved as lgbm_model.pkl")
