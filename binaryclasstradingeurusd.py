@@ -1,5 +1,4 @@
-# app.py - Multi-pair Signal Predictor
-
+# app.py - Multi-Pair Signal Predictor
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -204,4 +203,19 @@ if uploaded_file is not None:
     # -------------------------
     # Feature importance
     # -------------------------
-    st.sub
+    st.subheader("Top 20 Feature Importances")
+    fig, ax = plt.subplots(figsize=(10,6))
+    lgb.plot_importance(model, max_num_features=20, importance_type='gain', ax=ax)
+    st.pyplot(fig)
+
+    # -------------------------
+    # Price chart with Buy/Sell markers
+    # -------------------------
+    st.subheader("Price Chart with Buy/Sell Signals")
+    plt.figure(figsize=(12,6))
+    plt.plot(df_model['Close'], label='Close Price', color='blue')
+
+    buy_signals = df_model[df_model['Predicted_Label_Str'] == "Buy"]
+    plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy', s=100)
+
+    sell_signals = df_model[df_model['Pred
