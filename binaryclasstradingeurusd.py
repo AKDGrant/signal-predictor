@@ -1,4 +1,4 @@
-# app.py - Streamlit-ready Signal Predictor with current & next move + target prices
+# app.py - Complete Signal Predictor with Visual Chart
 
 import streamlit as st
 import pandas as pd
@@ -215,6 +215,28 @@ if uploaded_file is not None:
     fig, ax = plt.subplots(figsize=(10,6))
     lgb.plot_importance(model, max_num_features=20, importance_type='gain', ax=ax)
     st.pyplot(fig)
+
+    # -------------------------
+    # Plot price with Buy/Sell markers
+    # -------------------------
+    st.subheader("Price Chart with Buy/Sell Signals")
+    plt.figure(figsize=(12,6))
+    plt.plot(df_model['Close'], label='Close Price', color='blue')
+
+    # Buy signals
+    buy_signals = df_model[df_model['Predicted_Label_Str'] == "Buy"]
+    plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy', s=100)
+
+    # Sell signals
+    sell_signals = df_model[df_model['Predicted_Label_Str'] == "Sell"]
+    plt.scatter(sell_signals.index, sell_signals['Close'], marker='v', color='red', label='Sell', s=100)
+
+    plt.title("EUR/USD Close Price with Predicted Buy/Sell Signals")
+    plt.xlabel("Index")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid(True)
+    st.pyplot(plt)
 
     # Save model
     joblib.dump(model, 'lgbm_model.pkl')
