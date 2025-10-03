@@ -1,4 +1,4 @@
-# app.py - Complete Signal Predictor with Visual Chart
+# app.py - Multi-pair Signal Predictor
 
 import streamlit as st
 import pandas as pd
@@ -13,24 +13,33 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-st.title("Week 2 Signal Predictor - EUR/USD")
+st.title("Multi-Pair Signal Predictor")
 
 # -------------------------
-# Dataset upload
+# Select currency pair
 # -------------------------
-uploaded_file = st.file_uploader("Upload Week 1 dataset CSV", type="csv")
+pair_options = ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "BTC/USD"]
+pair_name = st.selectbox("Select currency pair", pair_options)
+
+# -------------------------
+# Upload CSV
+# -------------------------
+uploaded_file = st.file_uploader(f"Upload CSV for {pair_name}", type="csv")
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file, parse_dates=True)
-    st.write("Dataset loaded. Shape:", df.shape)
+    st.write(f"{pair_name} dataset loaded. Shape:", df.shape)
     st.dataframe(df.head())
 
     # -------------------------
-    # Feature Engineering
+    # Threshold sliders
     # -------------------------
-    LOOKAHEAD = 10
-    UP_TH = 0.01
-    DOWN_TH = -0.01
+    UP_TH = st.slider("Buy threshold (fractional return)", 0.001, 0.05, 0.01, 0.001)
+    DOWN_TH = st.slider("Sell threshold (fractional return)", -0.05, -0.001, -0.01, 0.001)
+    LOOKAHEAD = st.number_input("Lookahead periods for label", value=10, step=1)
 
+    # -------------------------
+    # Feature engineering
+    # -------------------------
     def rsi(series, window=14):
         delta = series.diff()
         gain = delta.clip(lower=0)
@@ -62,40 +71,33 @@ if uploaded_file is not None:
     # Price-based features
     df['ret'] = df['Close'].pct_change()
     df['logret'] = np.log(df['Close']).diff()
-
-    # Moving averages
     df['sma_10'] = df['Close'].rolling(10).mean()
     df['sma_50'] = df['Close'].rolling(50).mean()
     df['ema_12'] = df['Close'].ewm(span=12, adjust=False).mean()
-
-    # Technical indicators
     df['rsi_14'] = rsi(df['Close'], 14)
     df['macd'], df['macd_signal'] = macd(df['Close'])
     df['stoch_k'] = stochastic_k(df['High'], df['Low'], df['Close'], 14)
     df['atr_14'] = atr(df['High'], df['Low'], df['Close'], 14)
 
-    # Lagged returns
     for lag in [1, 2, 3, 5, 10]:
         df[f'ret_lag_{lag}'] = df['ret'].shift(lag)
 
-    # Structural features from Week-1
+    # Structural features
     possible_struct = ['Swing_High', 'Swing_Low', 'Support_Level', 'Resistance_Level',
                        'Supply_Zone_Width', 'Demand_Zone_Width', 'Nearest_Fib_Dist']
     struct_cols = [c for c in possible_struct if c in df.columns]
 
-    st.write("Using structural columns:", struct_cols)
-
-    # Label creation
+    # Labels
     df['fwd_close'] = df['Close'].shift(-LOOKAHEAD)
     df['fwd_ret'] = (df['fwd_close'] - df['Close']) / df['Close']
 
     def label_from_ret(x):
         if x >= UP_TH:
-            return 1      # Buy
+            return 1
         elif x <= DOWN_TH:
-            return -1     # Sell
+            return -1
         else:
-            return 0     # Hold
+            return 0
 
     df['label'] = df['fwd_ret'].apply(lambda x: label_from_ret(x) if pd.notnull(x) else np.nan)
 
@@ -103,7 +105,6 @@ if uploaded_file is not None:
                     'macd','macd_signal','stoch_k','atr_14'] + \
                    [f'ret_lag_{lag}' for lag in [1,2,3,5,10]] + struct_cols
 
-    # Keep Close column for display
     df_model = df[feature_cols + ['label']].copy()
     df_model['Close'] = df['Close']
     df_model = df_model.dropna()
@@ -112,17 +113,15 @@ if uploaded_file is not None:
     st.bar_chart(df_model['label'].value_counts())
 
     # -------------------------
-    # Prepare data for model
+    # Train/test split
     # -------------------------
     X = df_model.drop(['label'], axis=1)
     y = df_model['label']
 
-    # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, shuffle=False
     )
 
-    # Drop missing values
     X_train = X_train.dropna()
     y_train = y_train.loc[X_train.index]
     X_test = X_test.dropna()
@@ -139,7 +138,6 @@ if uploaded_file is not None:
     )
     model.fit(X_train, y_train)
 
-    # Make predictions
     df_model['Predicted_Label'] = model.predict(X)
     label_map = {1: "Buy", 0: "Hold", -1: "Sell"}
     df_model['Predicted_Label_Str'] = df_model['Predicted_Label'].map(label_map)
@@ -155,23 +153,19 @@ if uploaded_file is not None:
     st.write(f"Price: {latest_price:.5f}")
     st.write(f"Signal: {latest_signal}")
 
-    # Target for current signal
     if latest_signal == "Buy":
-        current_target = latest_price * (1 + UP_TH)
-        st.write(f"Target Price (for current Buy): {current_target:.5f}")
+        st.write(f"Target Price (for current Buy): {latest_price * (1 + UP_TH):.5f}")
     elif latest_signal == "Sell":
-        current_target = latest_price * (1 + DOWN_TH)
-        st.write(f"Target Price (for current Sell): {current_target:.5f}")
+        st.write(f"Target Price (for current Sell): {latest_price * (1 + DOWN_TH):.5f}")
     else:
         st.write("No target for Hold signal.")
 
     # -------------------------
-    # Next Buy/Sell opportunity
+    # Next predicted move
     # -------------------------
     future_df = df_model[df_model.index > latest_row.name]
     next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
 
-    # Fallback if dataset is short
     if next_signal_row.empty:
         future_df = df_model.tail(20)
         next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
@@ -190,7 +184,7 @@ if uploaded_file is not None:
         st.write(f"Target Price: {next_target:.5f}")
     else:
         st.subheader("Next Predicted Move")
-        st.write("No Buy/Sell signals found in the next 20 rows (dataset may have ended).")
+        st.write("No Buy/Sell signals found in the next 20 rows.")
 
     # -------------------------
     # Last 20 signals
@@ -204,40 +198,10 @@ if uploaded_file is not None:
     y_test_pred = model.predict(X_test)
     st.subheader("Classification Report")
     st.text(classification_report(y_test, y_test_pred))
-
     st.subheader("Confusion Matrix")
     st.write(confusion_matrix(y_test, y_test_pred))
 
     # -------------------------
     # Feature importance
     # -------------------------
-    st.subheader("Top 20 Feature Importances")
-    fig, ax = plt.subplots(figsize=(10,6))
-    lgb.plot_importance(model, max_num_features=20, importance_type='gain', ax=ax)
-    st.pyplot(fig)
-
-    # -------------------------
-    # Plot price with Buy/Sell markers
-    # -------------------------
-    st.subheader("Price Chart with Buy/Sell Signals")
-    plt.figure(figsize=(12,6))
-    plt.plot(df_model['Close'], label='Close Price', color='blue')
-
-    # Buy signals
-    buy_signals = df_model[df_model['Predicted_Label_Str'] == "Buy"]
-    plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy', s=100)
-
-    # Sell signals
-    sell_signals = df_model[df_model['Predicted_Label_Str'] == "Sell"]
-    plt.scatter(sell_signals.index, sell_signals['Close'], marker='v', color='red', label='Sell', s=100)
-
-    plt.title("EUR/USD Close Price with Predicted Buy/Sell Signals")
-    plt.xlabel("Index")
-    plt.ylabel("Price")
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
-
-    # Save model
-    joblib.dump(model, 'lgbm_model.pkl')
-    st.write("Model saved as lgbm_model.pkl")
+    st.sub
