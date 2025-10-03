@@ -168,10 +168,8 @@ if uploaded_file is not None:
     # Upcoming Predicted Moves
     # -------------------------
     st.subheader("Upcoming Predicted Buy/Sell Signals")
-
     future_signals = df_model[df_model.index > latest_row.name]
     future_signals = future_signals[future_signals['Predicted_Label_Str'].isin(['Buy','Sell'])]
-
     if not future_signals.empty:
         future_signals = future_signals.copy()
         future_signals['Target_Price'] = future_signals.apply(
@@ -202,5 +200,29 @@ if uploaded_file is not None:
     # -------------------------
     st.subheader("Top 20 Feature Importances")
     fig, ax = plt.subplots(figsize=(10,6))
-    lgb.plot_importance(model, max_num_features=20, importance_type='
+    lgb.plot_importance(model, max_num_features=20, importance_type='gain', ax=ax)
+    st.pyplot(fig)
+
+    # -------------------------
+    # Price chart with Buy/Sell markers
+    # -------------------------
+    st.subheader("Price Chart with Buy/Sell Signals")
+    plt.figure(figsize=(12,6))
+    plt.plot(df_model['Close'], label='Close Price', color='blue')
+    buy_signals = df_model[df_model['Predicted_Label_Str']=="Buy"]
+    sell_signals = df_model[df_model['Predicted_Label_Str']=="Sell"]
+    plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy', s=100)
+    plt.scatter(sell_signals.index, sell_signals['Close'], marker='v', color='red', label='Sell', s=100)
+    plt.title(f"{pair_name} Close Price with Predicted Buy/Sell Signals")
+    plt.xlabel("Index")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid(True)
+    st.pyplot(plt)
+
+    # -------------------------
+    # Save model
+    # -------------------------
+    joblib.dump(model, f'lgbm_model_{pair_name.replace("/", "")}.pkl')
+    st.write(f"Model saved as lgbm_model_{pair_name.replace("/", "")}.pkl")
 
