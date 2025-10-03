@@ -103,7 +103,11 @@ if uploaded_file is not None:
                     'macd','macd_signal','stoch_k','atr_14'] + \
                    [f'ret_lag_{lag}' for lag in [1,2,3,5,10]] + struct_cols
 
-    df_model = df[feature_cols + ['label']].dropna()
+    # Keep Close column for later display
+    df_model = df[feature_cols + ['label']].copy()
+    df_model['Close'] = df['Close']
+    df_model = df_model.dropna()
+
     st.write("Label distribution:")
     st.bar_chart(df_model['label'].value_counts())
 
