@@ -1,4 +1,4 @@
-# app.py - Streamlit-ready Signal Predictor with Buy/Sell/Hold signals
+# app.py - Streamlit-ready Signal Predictor with next move & target prices
 
 import streamlit as st
 import pandas as pd
@@ -103,7 +103,7 @@ if uploaded_file is not None:
                     'macd','macd_signal','stoch_k','atr_14'] + \
                    [f'ret_lag_{lag}' for lag in [1,2,3,5,10]] + struct_cols
 
-    # Keep Close column for later display
+    # Keep Close column for display
     df_model = df[feature_cols + ['label']].copy()
     df_model['Close'] = df['Close']
     df_model = df_model.dropna()
@@ -145,18 +145,39 @@ if uploaded_file is not None:
     df_model['Predicted_Label_Str'] = df_model['Predicted_Label'].map(label_map)
 
     # -------------------------
-    # Show most recent price & signal
+    # Most recent price & signal
     # -------------------------
     latest_row = df_model.iloc[-1]
     latest_price = latest_row['Close']
     latest_signal = latest_row['Predicted_Label_Str']
-
     st.subheader("Most Recent Price & Signal")
     st.write(f"Price: {latest_price:.5f}")
     st.write(f"Signal: {latest_signal}")
 
     # -------------------------
-    # Display last 20 signals
+    # Next Buy/Sell opportunity
+    # -------------------------
+    future_df = df_model[df_model.index > latest_row.name]
+    next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
+
+    if not next_signal_row.empty:
+        next_row = next_signal_row.iloc[0]
+        next_price = next_row['Close']
+        next_signal = next_row['Predicted_Label_Str']
+        if next_signal == "Buy":
+            target = next_price * (1 + UP_TH)
+        elif next_signal == "Sell":
+            target = next_price * (1 + DOWN_TH)
+        st.subheader("Next Predicted Move")
+        st.write(f"Signal: {next_signal}")
+        st.write(f"Price: {next_price:.5f}")
+        st.write(f"Target Price: {target:.5f}")
+    else:
+        st.subheader("Next Predicted Move")
+        st.write("No Buy/Sell signals predicted in the next 10 rows.")
+
+    # -------------------------
+    # Last 20 signals
     # -------------------------
     st.subheader("Last 20 Predicted Signals")
     st.dataframe(df_model[['Close', 'Predicted_Label_Str']].tail(20))
@@ -165,7 +186,6 @@ if uploaded_file is not None:
     # Model evaluation
     # -------------------------
     y_test_pred = model.predict(X_test)
-
     st.subheader("Classification Report")
     st.text(classification_report(y_test, y_test_pred))
 
