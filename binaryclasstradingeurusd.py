@@ -37,7 +37,7 @@ if uploaded_file is not None:
     LOOKAHEAD = st.number_input("Lookahead periods for label", value=10, step=1)
 
     # -------------------------
-    # Feature engineering
+    # Feature engineering functions
     # -------------------------
     def rsi(series, window=14):
         delta = series.diff()
@@ -67,7 +67,9 @@ if uploaded_file is not None:
         highest_high = high.rolling(k_window).max()
         return 100 * (close - lowest_low) / (highest_high - lowest_low)
 
-    # Price-based features
+    # -------------------------
+    # Compute features
+    # -------------------------
     df['ret'] = df['Close'].pct_change()
     df['logret'] = np.log(df['Close']).diff()
     df['sma_10'] = df['Close'].rolling(10).mean()
@@ -78,15 +80,19 @@ if uploaded_file is not None:
     df['stoch_k'] = stochastic_k(df['High'], df['Low'], df['Close'], 14)
     df['atr_14'] = atr(df['High'], df['Low'], df['Close'], 14)
 
-    for lag in [1, 2, 3, 5, 10]:
+    for lag in [1,2,3,5,10]:
         df[f'ret_lag_{lag}'] = df['ret'].shift(lag)
 
-    # Structural features
+    # -------------------------
+    # Structural features if available
+    # -------------------------
     possible_struct = ['Swing_High', 'Swing_Low', 'Support_Level', 'Resistance_Level',
                        'Supply_Zone_Width', 'Demand_Zone_Width', 'Nearest_Fib_Dist']
     struct_cols = [c for c in possible_struct if c in df.columns]
 
-    # Labels
+    # -------------------------
+    # Create labels
+    # -------------------------
     df['fwd_close'] = df['Close'].shift(-LOOKAHEAD)
     df['fwd_ret'] = (df['fwd_close'] - df['Close']) / df['Close']
 
@@ -151,11 +157,10 @@ if uploaded_file is not None:
     st.subheader("Most Recent Price & Signal")
     st.write(f"Price: {latest_price:.5f}")
     st.write(f"Signal: {latest_signal}")
-
     if latest_signal == "Buy":
-        st.write(f"Target Price (for current Buy): {latest_price * (1 + UP_TH):.5f}")
+        st.write(f"Target Price: {latest_price*(1+UP_TH):.5f}")
     elif latest_signal == "Sell":
-        st.write(f"Target Price (for current Sell): {latest_price * (1 + DOWN_TH):.5f}")
+        st.write(f"Target Price: {latest_price*(1+DOWN_TH):.5f}")
     else:
         st.write("No target for Hold signal.")
 
@@ -169,20 +174,16 @@ if uploaded_file is not None:
         future_df = df_model.tail(20)
         next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
 
+    st.subheader("Next Predicted Move")
     if not next_signal_row.empty:
         next_row = next_signal_row.iloc[0]
         next_price = next_row['Close']
         next_signal = next_row['Predicted_Label_Str']
-        if next_signal == "Buy":
-            next_target = next_price * (1 + UP_TH)
-        elif next_signal == "Sell":
-            next_target = next_price * (1 + DOWN_TH)
-        st.subheader("Next Predicted Move")
+        next_target = next_price*(1+UP_TH) if next_signal=="Buy" else next_price*(1+DOWN_TH)
         st.write(f"Signal: {next_signal}")
         st.write(f"Price: {next_price:.5f}")
         st.write(f"Target Price: {next_target:.5f}")
     else:
-        st.subheader("Next Predicted Move")
         st.write("No Buy/Sell signals found in the next 20 rows.")
 
     # -------------------------
@@ -214,8 +215,7 @@ if uploaded_file is not None:
     st.subheader("Price Chart with Buy/Sell Signals")
     plt.figure(figsize=(12,6))
     plt.plot(df_model['Close'], label='Close Price', color='blue')
-
-    buy_signals = df_model[df_model['Predicted_Label_Str'] == "Buy"]
+    buy_signals = df_model[df_model['Predicted_Label_Str']=="Buy"]
+    sell_signals = df_model[df_model['Predicted_Label_Str']=="Sell"]
     plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy', s=100)
-
-    sell_signals = df_model[df_model['Pred
+    plt.scatter(sell_signals.index, sell_signals['Close'],
