@@ -170,10 +170,6 @@ if uploaded_file is not None:
     future_df = df_model[df_model.index > latest_row.name]
     next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
 
-    if next_signal_row.empty:
-        future_df = df_model.tail(20)
-        next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
-
     st.subheader("Next Predicted Move")
     if not next_signal_row.empty:
         next_row = next_signal_row.iloc[0]
@@ -218,4 +214,16 @@ if uploaded_file is not None:
     buy_signals = df_model[df_model['Predicted_Label_Str']=="Buy"]
     sell_signals = df_model[df_model['Predicted_Label_Str']=="Sell"]
     plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy', s=100)
-    plt.scatter(sell_signals.index, sell_signals['Close'],
+    plt.scatter(sell_signals.index, sell_signals['Close'], marker='v', color='red', label='Sell', s=100)
+    plt.title(f"{pair_name} Close Price with Predicted Buy/Sell Signals")
+    plt.xlabel("Index")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid(True)
+    st.pyplot(plt)
+
+    # -------------------------
+    # Save model
+    # -------------------------
+    joblib.dump(model, f'lgbm_model_{pair_name.replace("/", "")}.pkl')
+    st.write(f"Model saved as lgbm_model_{pair_name.replace('/', '')}.pkl")
