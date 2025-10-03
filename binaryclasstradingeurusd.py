@@ -1,4 +1,4 @@
-# app.py - Streamlit-ready Signal Predictor with next move & target prices
+# app.py - Streamlit-ready Signal Predictor with current & next move + target prices
 
 import streamlit as st
 import pandas as pd
@@ -150,9 +150,20 @@ if uploaded_file is not None:
     latest_row = df_model.iloc[-1]
     latest_price = latest_row['Close']
     latest_signal = latest_row['Predicted_Label_Str']
+
     st.subheader("Most Recent Price & Signal")
     st.write(f"Price: {latest_price:.5f}")
     st.write(f"Signal: {latest_signal}")
+
+    # Target for current signal
+    if latest_signal == "Buy":
+        current_target = latest_price * (1 + UP_TH)
+        st.write(f"Target Price (for current Buy): {current_target:.5f}")
+    elif latest_signal == "Sell":
+        current_target = latest_price * (1 + DOWN_TH)
+        st.write(f"Target Price (for current Sell): {current_target:.5f}")
+    else:
+        st.write("No target for Hold signal.")
 
     # -------------------------
     # Next Buy/Sell opportunity
@@ -160,21 +171,26 @@ if uploaded_file is not None:
     future_df = df_model[df_model.index > latest_row.name]
     next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
 
+    # Fallback if dataset is short
+    if next_signal_row.empty:
+        future_df = df_model.tail(20)
+        next_signal_row = future_df[future_df['Predicted_Label_Str'].isin(['Buy','Sell'])].head(1)
+
     if not next_signal_row.empty:
         next_row = next_signal_row.iloc[0]
         next_price = next_row['Close']
         next_signal = next_row['Predicted_Label_Str']
         if next_signal == "Buy":
-            target = next_price * (1 + UP_TH)
+            next_target = next_price * (1 + UP_TH)
         elif next_signal == "Sell":
-            target = next_price * (1 + DOWN_TH)
+            next_target = next_price * (1 + DOWN_TH)
         st.subheader("Next Predicted Move")
         st.write(f"Signal: {next_signal}")
         st.write(f"Price: {next_price:.5f}")
-        st.write(f"Target Price: {target:.5f}")
+        st.write(f"Target Price: {next_target:.5f}")
     else:
         st.subheader("Next Predicted Move")
-        st.write("No Buy/Sell signals predicted in the next 10 rows.")
+        st.write("No Buy/Sell signals found in the next 20 rows (dataset may have ended).")
 
     # -------------------------
     # Last 20 signals
